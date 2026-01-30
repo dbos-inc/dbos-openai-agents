@@ -40,7 +40,8 @@ async def test_tool_call(dbos_env):
     tool_calls_made = []
 
     @function_tool
-    def get_weather(city: str) -> str:
+    @DBOS.step()
+    async def get_weather(city: str) -> str:
         """Get the weather for a city."""
         tool_calls_made.append(city)
         return f"Sunny in {city}"
@@ -66,7 +67,7 @@ async def test_tool_call(dbos_env):
     steps = await DBOS.list_workflow_steps_async(workflows[0].workflow_id)
     assert len(steps) == 3
     assert steps[0]["function_name"] == "_model_call_step"
-    assert steps[1]["function_name"] == "_tool_call_step"
+    assert "get_weather" in steps[1]["function_name"]
     assert steps[2]["function_name"] == "_model_call_step"
 
 
@@ -75,15 +76,14 @@ async def test_multiple_tool_calls(dbos_env):
     """DurableRunner handles parallel tool calls that start in deterministic order."""
     num_calls = 100
     cities = [f"city_{i}" for i in range(num_calls)]
-    start_order = []
     concurrent = 0
     max_concurrent = 0
 
     @function_tool
+    @DBOS.step()
     async def get_weather(city: str) -> str:
         """Get the weather for a city."""
         nonlocal concurrent, max_concurrent
-        start_order.append(city)
         concurrent += 1
         max_concurrent = max(max_concurrent, concurrent)
         await asyncio.sleep(1)
@@ -115,8 +115,6 @@ async def test_multiple_tool_calls(dbos_env):
 
     output = await wf("Weather everywhere?")
     assert output == "Done."
-    # Turnstile ensures tools start in deterministic order
-    assert start_order == cities
     # Tools actually run concurrently (not sequentially)
     assert max_concurrent > 1, f"Expected concurrent execution, but max_concurrent={max_concurrent}"
 
@@ -126,6 +124,9 @@ async def test_multiple_tool_calls(dbos_env):
     steps = await DBOS.list_workflow_steps_async(workflows[0].workflow_id)
     assert len(steps) == num_calls + 2
     assert steps[0]["function_name"] == "_model_call_step"
-    for i in range(1, num_calls + 1):
-        assert steps[i]["function_name"] == "_tool_call_step"
+    # Steps are ordered by function_id — verify each tool step recorded
+    # the correct city output in deterministic order
+    for i in range(num_calls):
+        assert "get_weather" in steps[i + 1]["function_name"]
+        assert steps[i + 1]["output"] == f"Sunny in {cities[i]}"
     assert steps[num_calls + 1]["function_name"] == "_model_call_step"

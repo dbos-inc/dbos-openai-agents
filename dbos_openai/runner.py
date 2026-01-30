@@ -82,12 +82,6 @@ async def _model_call_step(call_fn):
     return await call_fn()
 
 
-@DBOS.step()
-async def _tool_call_step(call_fn):
-    """Execute a tool call as a durable DBOS step."""
-    return await call_fn()
-
-
 # ---------------------------------------------------------------------------
 # Model provider / wrapper
 # ---------------------------------------------------------------------------
@@ -147,19 +141,9 @@ def _create_tool_wrapper(state: _State, tool: FunctionTool):
         call_id = tool_context.tool_call_id
 
         await turnstile.wait_for(call_id)
+        turnstile.allow_next_after(call_id)
         try:
-            async def call_tool():
-                # Signal the next tool to start now that this step has been
-                # entered and assigned its function_id.  The actual tool work
-                # below can then run concurrently with subsequent tools.
-                turnstile.allow_next_after(call_id)
-                return await tool.on_invoke_tool(tool_context, tool_input)
-
-            result = await _tool_call_step(call_tool)
-            # Also signal here for the replay path where call_tool is never
-            # invoked (DBOS returns the cached result instead).
-            turnstile.allow_next_after(call_id)
-            return result
+            return await tool.on_invoke_tool(tool_context, tool_input)
         except BaseException as ex:
             turnstile.cancel_all_after(call_id)
             raise ex from None
