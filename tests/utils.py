@@ -1,4 +1,4 @@
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 from agents import Usage
 from agents.items import ModelResponse, TResponseStreamEvent
@@ -54,21 +54,21 @@ class FakeModel(Model):
 
     async def get_response(
         self,
-        system_instructions,
-        input,
-        model_settings,
-        tools,
-        output_schema,
-        handoffs,
-        tracing,
+        system_instructions: Any,
+        input: Any,
+        model_settings: Any,
+        tools: Any,
+        output_schema: Any,
+        handoffs: Any,
+        tracing: Any,
         *,
-        previous_response_id=None,
-        conversation_id=None,
-        prompt=None,
+        previous_response_id: Any = None,
+        conversation_id: Any = None,
+        prompt: Any = None,
     ) -> ModelResponse:
         resp = self.responses[self.call_count]
         self.call_count += 1
         return resp
 
-    def stream_response(self, *args, **kwargs) -> AsyncIterator[TResponseStreamEvent]:
+    def stream_response(self, *args: Any, **kwargs: Any) -> AsyncIterator[TResponseStreamEvent]:
         raise NotImplementedError

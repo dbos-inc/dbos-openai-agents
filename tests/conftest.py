@@ -1,9 +1,11 @@
+from typing import Iterator
+
 import pytest
 from dbos import DBOS, DBOSConfig
 
 
 @pytest.fixture()
-def dbos_env():
+def dbos_env() -> Iterator[None]:
     DBOS.destroy()
     config: DBOSConfig = {
         "name": "test-app",

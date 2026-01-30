@@ -22,15 +22,15 @@ from dbos_openai import DurableRunner
 
 
 @pytest.mark.asyncio
-async def test_simple_message(dbos_env):
+async def test_simple_message(dbos_env: None) -> None:
     """DurableRunner returns a simple text response."""
     model = FakeModel([make_message_response("Hello!")])
     agent = Agent(name="test", model=model)
 
     @DBOS.workflow()
-    async def wf(user_input: str):
+    async def wf(user_input: str) -> str:
         result = await DurableRunner.run(agent, user_input)
-        return result.final_output
+        return str(result.final_output)
 
     output = await wf("Hi")
     assert output == "Hello!"
@@ -44,9 +44,9 @@ async def test_simple_message(dbos_env):
 
 
 @pytest.mark.asyncio
-async def test_tool_call(dbos_env):
+async def test_tool_call(dbos_env: None) -> None:
     """DurableRunner executes a tool call and returns the final message."""
-    tool_calls_made = []
+    tool_calls_made: list[str] = []
 
     @function_tool
     @DBOS.step()
@@ -64,9 +64,9 @@ async def test_tool_call(dbos_env):
     agent = Agent(name="test", model=model, tools=[get_weather])
 
     @DBOS.workflow()
-    async def wf(user_input: str):
+    async def wf(user_input: str) -> str:
         result = await DurableRunner.run(agent, user_input)
-        return result.final_output
+        return str(result.final_output)
 
     output = await wf("What's the weather in NYC?")
     assert output == "The weather in NYC is sunny."
@@ -83,7 +83,7 @@ async def test_tool_call(dbos_env):
 
 
 @pytest.mark.asyncio
-async def test_multiple_tool_calls(dbos_env):
+async def test_multiple_tool_calls(dbos_env: None) -> None:
     """DurableRunner handles parallel tool calls that start in deterministic order."""
     num_calls = 100
     cities = [f"city_{i}" for i in range(num_calls)]
@@ -122,9 +122,9 @@ async def test_multiple_tool_calls(dbos_env):
     agent = Agent(name="test", model=model, tools=[get_weather])
 
     @DBOS.workflow()
-    async def wf(user_input: str):
+    async def wf(user_input: str) -> str:
         result = await DurableRunner.run(agent, user_input)
-        return result.final_output
+        return str(result.final_output)
 
     output = await wf("Weather everywhere?")
     assert output == "Done."
@@ -148,7 +148,7 @@ async def test_multiple_tool_calls(dbos_env):
 
 
 @pytest.mark.asyncio
-async def test_guardrails(dbos_env):
+async def test_guardrails(dbos_env: None) -> None:
     """DurableRunner works with DBOS step-annotated guardrails on tools and agent output."""
 
     @tool_input_guardrail
@@ -203,9 +203,9 @@ async def test_guardrails(dbos_env):
     )
 
     @DBOS.workflow()
-    async def wf(user_input: str):
+    async def wf(user_input: str) -> str:
         result = await DurableRunner.run(agent, user_input)
-        return result.final_output
+        return str(result.final_output)
 
     output = await wf("What's the weather in NYC?")
     assert output == "The weather in NYC is sunny."

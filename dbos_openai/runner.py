@@ -1,6 +1,6 @@
 import dataclasses
 from asyncio import Event
-from typing import Any, AsyncIterator, List
+from typing import Any, AsyncIterator, Callable, Awaitable, List
 
 from agents import (
     Agent,
@@ -80,7 +80,7 @@ class _State:
 @DBOS.step(
     retries_allowed=True, max_attempts=10, interval_seconds=1.0, backoff_rate=2.0
 )
-async def _model_call_step(call_fn):
+async def _model_call_step(call_fn: Callable[[], Awaitable[ModelResponse]]) -> ModelResponse:
     """Execute an LLM call as a durable DBOS step with retries."""
     return await call_fn()
 
@@ -115,11 +115,11 @@ class DBOSModelWrapper(Model):
         self.model_name = "DBOSModelWrapper"
         self._state = state
 
-    async def get_response(self, *args, **kwargs) -> ModelResponse:
-        async def call_llm():
+    async def get_response(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        async def call_llm() -> ModelResponse:
             return await self.model.get_response(*args, **kwargs)
 
-        result = await _model_call_step(call_llm)
+        result: ModelResponse = await _model_call_step(call_llm)
 
         # Prepare the turnstile for any tool calls in the response
         ids = _get_function_call_ids(result.output)
@@ -127,7 +127,7 @@ class DBOSModelWrapper(Model):
 
         return result
 
-    def stream_response(self, *args, **kwargs) -> AsyncIterator[TResponseStreamEvent]:
+    def stream_response(self, *args: Any, **kwargs: Any) -> AsyncIterator[TResponseStreamEvent]:
         raise NotImplementedError(
             "Streaming is not supported in durable mode. Use DurableRunner.run() instead."
         )
@@ -138,8 +138,10 @@ class DBOSModelWrapper(Model):
 # ---------------------------------------------------------------------------
 
 
-def _create_tool_wrapper(state: _State, tool: FunctionTool):
-    """Create a turnstile-gated, DBOS-step-wrapped on_invoke_tool."""
+def _create_tool_wrapper(
+    state: _State, tool: FunctionTool
+) -> Callable[[ToolContext[Any], str], Awaitable[Any]]:
+    """Create a turnstile-gated on_invoke_tool wrapper."""
 
     async def on_invoke_tool_wrapper(
         tool_context: ToolContext[Any], tool_input: str
@@ -194,7 +196,7 @@ def _wrap_handoff(handoff: Handoff[TContext], state: _State) -> Handoff[TContext
     """Wrap a Handoff so the agent it produces also has wrapped tools."""
     original = handoff.on_invoke_handoff
 
-    async def wrapped(*args, **kwargs) -> Any:
+    async def wrapped(*args: Any, **kwargs: Any) -> Any:
         agent = await original(*args, **kwargs)
         return _wrap_agent(agent, state)
 
@@ -224,8 +226,8 @@ class DurableRunner:
     @staticmethod
     async def run(
         starting_agent: Agent[TContext],
-        input: str | list,
-        **kwargs,
+        input: str | list[Any],
+        **kwargs: Any,
     ) -> RunResult:
         state = _State()
 
