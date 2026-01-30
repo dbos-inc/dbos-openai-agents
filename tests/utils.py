@@ -70,5 +70,7 @@ class FakeModel(Model):
         self.call_count += 1
         return resp
 
-    def stream_response(self, *args: Any, **kwargs: Any) -> AsyncIterator[TResponseStreamEvent]:
+    def stream_response(
+        self, *args: Any, **kwargs: Any
+    ) -> AsyncIterator[TResponseStreamEvent]:
         raise NotImplementedError

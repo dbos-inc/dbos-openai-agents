@@ -1,6 +1,6 @@
 import dataclasses
 from asyncio import Event
-from typing import Any, AsyncIterator, Callable, Awaitable, List
+from typing import Any, AsyncIterator, Awaitable, Callable, List
 
 from agents import (
     Agent,
@@ -80,7 +80,9 @@ class _State:
 @DBOS.step(
     retries_allowed=True, max_attempts=10, interval_seconds=1.0, backoff_rate=2.0
 )
-async def _model_call_step(call_fn: Callable[[], Awaitable[ModelResponse]]) -> ModelResponse:
+async def _model_call_step(
+    call_fn: Callable[[], Awaitable[ModelResponse]],
+) -> ModelResponse:
     """Execute an LLM call as a durable DBOS step with retries."""
     return await call_fn()
 
@@ -127,7 +129,9 @@ class DBOSModelWrapper(Model):
 
         return result
 
-    def stream_response(self, *args: Any, **kwargs: Any) -> AsyncIterator[TResponseStreamEvent]:
+    def stream_response(
+        self, *args: Any, **kwargs: Any
+    ) -> AsyncIterator[TResponseStreamEvent]:
         raise NotImplementedError(
             "Streaming is not supported in durable mode. Use DurableRunner.run() instead."
         )
@@ -224,6 +228,7 @@ class DurableRunner:
             result = await DurableRunner.run(agent, user_input)
             return result.final_output
     """
+
     # This is not a workflow because the Agent type is not pickle-able.
     @staticmethod
     async def run(
