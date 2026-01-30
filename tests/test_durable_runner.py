@@ -444,3 +444,40 @@ async def test_replay(dbos_env: None) -> None:
 
     # The tool was NOT re-executed during replay
     assert call_count == 1
+
+
+def test_streaming_not_supported() -> None:
+    """DBOSModelWrapper.stream_response raises NotImplementedError."""
+    from dbos_openai.runner import DBOSModelWrapper, _State
+
+    wrapper = DBOSModelWrapper(FakeModel([]), _State())
+    with pytest.raises(NotImplementedError, match="Streaming is not supported"):
+        wrapper.stream_response()
+
+
+@pytest.mark.asyncio
+async def test_string_model_name(dbos_env: None) -> None:
+    """When agent.model is a string, DBOSModelProvider resolves and wraps it."""
+    from unittest.mock import patch
+
+    from agents.models.multi_provider import MultiProvider
+
+    fake = FakeModel([make_message_response("Hello!")])
+    agent = Agent(name="test", model="fake-model")
+
+    with patch.object(MultiProvider, "get_model", return_value=fake):
+
+        @DBOS.workflow()
+        async def wf(user_input: str) -> str:
+            result = await DurableRunner.run(agent, user_input)
+            return str(result.final_output)
+
+        output = await wf("Hi")
+
+    assert output == "Hello!"
+
+    workflows = await DBOS.list_workflows_async()
+    assert len(workflows) == 1
+    steps = await DBOS.list_workflow_steps_async(workflows[0].workflow_id)
+    assert len(steps) == 1
+    assert steps[0]["function_name"] == "_model_call_step"

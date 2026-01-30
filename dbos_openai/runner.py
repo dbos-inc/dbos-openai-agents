@@ -33,31 +33,16 @@ class Turnstile:
     def __init__(self, ids: list[str]):
         self.turns = dict(zip(ids, ids[1:]))
         self.events = {id: Event() for id in ids}
-        self.canceled = False
         if ids:
             self.events[ids[0]].set()
 
     async def wait_for(self, id: str) -> None:
-        event = self.events[id]
-        await event.wait()
-        if self.canceled:
-            raise _CanceledError()
+        await self.events[id].wait()
 
     def allow_next_after(self, id: str) -> None:
         next_id = self.turns.get(id)
         if next_id is not None:
             self.events[next_id].set()
-
-    def cancel_all_after(self, id: str) -> None:
-        self.canceled = True
-        next_id = self.turns.get(id)
-        while next_id is not None:
-            self.events[next_id].set()
-            next_id = self.turns.get(next_id)
-
-
-class _CanceledError(Exception):
-    """Raised when a turnstile-gated operation is canceled."""
 
 
 # ---------------------------------------------------------------------------
@@ -153,11 +138,7 @@ def _create_tool_wrapper(
 
         await turnstile.wait_for(call_id)
         turnstile.allow_next_after(call_id)
-        try:
-            return await tool.on_invoke_tool(tool_context, tool_input)
-        except BaseException as ex:
-            turnstile.cancel_all_after(call_id)
-            raise ex from None
+        return await tool.on_invoke_tool(tool_context, tool_input)
 
     return on_invoke_tool_wrapper
 
