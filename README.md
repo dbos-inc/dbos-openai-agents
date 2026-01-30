@@ -1,4 +1,4 @@
-# dbos-openai
+# Durable OpenAI Agents
 
 Durable execution for the [OpenAI Agents SDK](https://github.com/openai/openai-agents-python) using [DBOS](https://github.com/dbos-inc/dbos-transact-py).
 
