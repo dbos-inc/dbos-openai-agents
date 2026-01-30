@@ -25,8 +25,8 @@ from dbos import DBOS
 class Turnstile:
     """Serializes concurrent async operations in a fixed order by ID.
 
-    When the OpenAI agents SDK fires multiple tool calls via asyncio.gather,
-    DBOS needs them to hit their steps in a deterministic order so that
+    When the OpenAI agents SDK launches multiple tool calls via asyncio.gather,
+    DBOS needs them to start execution in a deterministic order so that
     function_id assignment is consistent on replay.
     """
 
@@ -45,11 +45,6 @@ class Turnstile:
             self.events[next_id].set()
 
 
-# ---------------------------------------------------------------------------
-# Shared execution state
-# ---------------------------------------------------------------------------
-
-
 class _State:
     __slots__ = ("turnstile",)
 
@@ -58,7 +53,7 @@ class _State:
 
 
 # ---------------------------------------------------------------------------
-# DBOS step wrappers (module-level so they're registered at import time)
+# Model wrapping
 # ---------------------------------------------------------------------------
 
 
@@ -68,11 +63,6 @@ async def _model_call_step(
 ) -> ModelResponse:
     """Execute an LLM call as a durable DBOS step with retries."""
     return await call_fn()
-
-
-# ---------------------------------------------------------------------------
-# Model provider / wrapper
-# ---------------------------------------------------------------------------
 
 
 def _get_function_call_ids(output: List[TResponseOutputItem]) -> List[str]:
@@ -189,16 +179,14 @@ def _wrap_handoff(handoff: Handoff[TContext], state: _State) -> Handoff[TContext
 
 
 # ---------------------------------------------------------------------------
-# DurableRunner — main entry point
+# DurableRunner
 # ---------------------------------------------------------------------------
 
 
 class DurableRunner:
     """Run an OpenAI agent with DBOS durability.
 
-    Must be called from within a ``@DBOS.workflow()`` to get durable
-    execution.  When called outside a workflow, model and tool calls
-    execute normally without durability.
+    Must be called from within a ``@DBOS.workflow()`` for durable execution.
 
     Example::
 
