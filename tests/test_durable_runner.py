@@ -223,3 +223,59 @@ async def test_guardrails(dbos_env: None) -> None:
     assert "validate_tool_output" in steps[3]["function_name"]
     assert steps[4]["function_name"] == "_model_call_step"
     assert "check_output" in steps[5]["function_name"]
+
+
+@pytest.mark.asyncio
+async def test_handoff(dbos_env: None) -> None:
+    """DurableRunner handles agent handoffs between multiple agents."""
+
+    @function_tool
+    @DBOS.step()
+    async def get_weather(city: str) -> str:
+        """Get the weather for a city."""
+        return f"Sunny in {city}"
+
+    # Weather agent: handles weather queries via a tool
+    weather_model = FakeModel(
+        [
+            make_tool_call_response("call_w1", "get_weather", '{"city": "NYC"}'),
+            make_message_response("The weather in NYC is sunny."),
+        ]
+    )
+    weather_agent = Agent(
+        name="weather_agent", model=weather_model, tools=[get_weather]
+    )
+
+    # Router agent: hands off to the weather agent
+    router_model = FakeModel(
+        [
+            make_tool_call_response(
+                "call_h1", "transfer_to_weather_agent", "{}"
+            ),
+        ]
+    )
+    router_agent = Agent(
+        name="router",
+        model=router_model,
+        handoffs=[weather_agent],
+    )
+
+    @DBOS.workflow()
+    async def wf(user_input: str) -> str:
+        result = await DurableRunner.run(router_agent, user_input)
+        return str(result.final_output)
+
+    output = await wf("What's the weather in NYC?")
+    assert output == "The weather in NYC is sunny."
+
+    # 1 workflow with 4 steps:
+    #   model call (router → handoff), model call (weather → tool call),
+    #   tool call (get_weather), model call (weather → message)
+    workflows = await DBOS.list_workflows_async()
+    assert len(workflows) == 1
+    steps = await DBOS.list_workflow_steps_async(workflows[0].workflow_id)
+    assert len(steps) == 4
+    assert steps[0]["function_name"] == "_model_call_step"
+    assert steps[1]["function_name"] == "_model_call_step"
+    assert "get_weather" in steps[2]["function_name"]
+    assert steps[3]["function_name"] == "_model_call_step"
