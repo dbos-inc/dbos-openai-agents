@@ -166,7 +166,7 @@ def _wrap_agent(agent: Agent[TContext], state: _State) -> Agent[TContext]:
     clone_kwargs: dict[str, Any] = {}
 
     # Wrap the model if it's a Model instance (the SDK uses it directly,
-    # bypassing the model_provider — see agents/run.py:2043).
+    # bypassing the model_provider).
     if isinstance(agent.model, Model) and not isinstance(agent.model, DBOSModelWrapper):
         clone_kwargs["model"] = DBOSModelWrapper(agent.model, state)
 
@@ -176,6 +176,8 @@ def _wrap_agent(agent: Agent[TContext], state: _State) -> Agent[TContext]:
             wrapper = _create_tool_wrapper(state, tool)
             wrapped_tools.append(dataclasses.replace(tool, on_invoke_tool=wrapper))
         else:
+            # Other tools either execute entirely server-side (no local component)
+            # or execute serially.
             wrapped_tools.append(tool)
     clone_kwargs["tools"] = wrapped_tools
 
