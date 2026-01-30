@@ -224,7 +224,7 @@ class DurableRunner:
             result = await DurableRunner.run(agent, user_input)
             return result.final_output
     """
-
+    # This is not a workflow because the Agent type is not pickle-able.
     @staticmethod
     async def run(
         starting_agent: Agent[TContext],
