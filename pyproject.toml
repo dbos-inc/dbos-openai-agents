@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling", "gitpython>=3.1.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dbos-openai"
+dynamic = ["version"]
+description = "DBOS integration for the OpenAI Agents SDK"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "DBOS, Inc." }]
+license = { text = "MIT" }
+keywords = ["dbos", "openai", "agents", "workflow", "durable"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "dbos>=2.10.0",
+    "openai-agents>=0.7.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/dbos-inc/dbos-openai"
+Repository = "https://github.com/dbos-inc/dbos-openai"
+
+[dependency-groups]
+dev = [
+    "black>=26.1.0",
+    "gitpython>=3.1.0",
+    "hatch>=1.0.0",
+    "isort>=7.0.0",
+    "mypy>=1.19.1",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+]
+
+[tool.hatch.version]
+source = "code"
+path = "publish/hatch_build.py"
+expression = "get_version()"
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
+filter_files = true
+atomic = true
+
+[tool.mypy]
+strict = true
+
+[tool.pytest.ini_options]
+addopts = "-s"
+log_cli_format = "%(asctime)s [%(levelname)8s] (%(name)s:%(filename)s:%(lineno)s) %(message)s"
+log_cli_level = "INFO"
+log_cli = true
