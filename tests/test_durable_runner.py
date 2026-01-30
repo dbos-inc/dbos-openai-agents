@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from dbos import DBOS
@@ -70,15 +72,22 @@ async def test_tool_call(dbos_env):
 
 @pytest.mark.asyncio
 async def test_multiple_tool_calls(dbos_env):
-    """DurableRunner handles 100 parallel tool calls in deterministic order."""
+    """DurableRunner handles parallel tool calls that start in deterministic order."""
     num_calls = 100
     cities = [f"city_{i}" for i in range(num_calls)]
-    call_order = []
+    start_order = []
+    concurrent = 0
+    max_concurrent = 0
 
     @function_tool
-    def get_weather(city: str) -> str:
+    async def get_weather(city: str) -> str:
         """Get the weather for a city."""
-        call_order.append(city)
+        nonlocal concurrent, max_concurrent
+        start_order.append(city)
+        concurrent += 1
+        max_concurrent = max(max_concurrent, concurrent)
+        await asyncio.sleep(1)
+        concurrent -= 1
         return f"Sunny in {city}"
 
     model = FakeModel([
@@ -106,8 +115,10 @@ async def test_multiple_tool_calls(dbos_env):
 
     output = await wf("Weather everywhere?")
     assert output == "Done."
-    # Turnstile ensures deterministic ordering matching the model response order
-    assert call_order == cities
+    # Turnstile ensures tools start in deterministic order
+    assert start_order == cities
+    # Tools actually run concurrently (not sequentially)
+    assert max_concurrent > 1, f"Expected concurrent execution, but max_concurrent={max_concurrent}"
 
     # 1 workflow, with 102 steps: 1 model call + 100 tool calls + 1 model call
     workflows = await DBOS.list_workflows_async()

@@ -149,9 +149,15 @@ def _create_tool_wrapper(state: _State, tool: FunctionTool):
         await turnstile.wait_for(call_id)
         try:
             async def call_tool():
+                # Signal the next tool to start now that this step has been
+                # entered and assigned its function_id.  The actual tool work
+                # below can then run concurrently with subsequent tools.
+                turnstile.allow_next_after(call_id)
                 return await tool.on_invoke_tool(tool_context, tool_input)
 
             result = await _tool_call_step(call_tool)
+            # Also signal here for the replay path where call_tool is never
+            # invoked (DBOS returns the cached result instead).
             turnstile.allow_next_after(call_id)
             return result
         except BaseException as ex:
