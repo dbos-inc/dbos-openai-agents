@@ -1,0 +1,17 @@
+[project]
+name = "dbos-openai"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "dbos>=2.10.0",
+    "openai-agents>=0.7.0",
+]
+
+[dependency-groups]
+dev = [
+    "black>=26.1.0",
+    "isort>=7.0.0",
+    "mypy>=1.19.1",
+]
