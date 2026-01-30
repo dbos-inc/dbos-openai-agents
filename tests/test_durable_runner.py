@@ -3,9 +3,19 @@ import asyncio
 import pytest
 
 from dbos import DBOS
-from agents import Agent, Usage
+from agents import (
+    Agent,
+    GuardrailFunctionOutput,
+    RunContextWrapper,
+    ToolGuardrailFunctionOutput,
+    Usage,
+    output_guardrail,
+    tool_input_guardrail,
+    tool_output_guardrail,
+)
 from agents.items import ModelResponse
 from agents.tool import function_tool
+from agents.tool_guardrails import ToolInputGuardrailData, ToolOutputGuardrailData
 from openai.types.responses import ResponseFunctionToolCall
 
 from utils import FakeModel, make_message_response, make_tool_call_response
@@ -130,3 +140,75 @@ async def test_multiple_tool_calls(dbos_env):
         assert "get_weather" in steps[i + 1]["function_name"]
         assert steps[i + 1]["output"] == f"Sunny in {cities[i]}"
     assert steps[num_calls + 1]["function_name"] == "_model_call_step"
+
+
+@pytest.mark.asyncio
+async def test_guardrails(dbos_env):
+    """DurableRunner works with DBOS step-annotated guardrails on tools and agent output."""
+
+    @tool_input_guardrail
+    @DBOS.step()
+    async def validate_tool_input(data: ToolInputGuardrailData) -> ToolGuardrailFunctionOutput:
+        """Check tool input is acceptable."""
+        return ToolGuardrailFunctionOutput.allow(output_info="input_ok")
+
+    @tool_output_guardrail
+    @DBOS.step()
+    async def validate_tool_output(data: ToolOutputGuardrailData) -> ToolGuardrailFunctionOutput:
+        """Check tool output is acceptable."""
+        return ToolGuardrailFunctionOutput.allow(output_info="output_ok")
+
+    @function_tool(
+        tool_input_guardrails=[validate_tool_input],
+        tool_output_guardrails=[validate_tool_output],
+    )
+    @DBOS.step()
+    async def get_weather(city: str) -> str:
+        """Get the weather for a city."""
+        return f"Sunny in {city}"
+
+    @output_guardrail
+    @DBOS.step()
+    async def check_output(
+        context: RunContextWrapper,
+        agent: Agent,
+        output: str,
+    ) -> GuardrailFunctionOutput:
+        """Verify the output is not empty."""
+        return GuardrailFunctionOutput(
+            output_info={"length": len(output)},
+            tripwire_triggered=len(output) == 0,
+        )
+
+    model = FakeModel([
+        make_tool_call_response("call_1", "get_weather", '{"city": "NYC"}'),
+        make_message_response("The weather in NYC is sunny."),
+    ])
+    agent = Agent(
+        name="test",
+        model=model,
+        tools=[get_weather],
+        output_guardrails=[check_output],
+    )
+
+    @DBOS.workflow()
+    async def wf(user_input: str):
+        result = await DurableRunner.run(agent, user_input)
+        return result.final_output
+
+    output = await wf("What's the weather in NYC?")
+    assert output == "The weather in NYC is sunny."
+
+    # 1 workflow with 6 steps:
+    #   model call, tool input guardrail, tool call, tool output guardrail,
+    #   model call, output guardrail
+    workflows = await DBOS.list_workflows_async()
+    assert len(workflows) == 1
+    steps = await DBOS.list_workflow_steps_async(workflows[0].workflow_id)
+    assert len(steps) == 6
+    assert steps[0]["function_name"] == "_model_call_step"
+    assert "validate_tool_input" in steps[1]["function_name"]
+    assert "get_weather" in steps[2]["function_name"]
+    assert "validate_tool_output" in steps[3]["function_name"]
+    assert steps[4]["function_name"] == "_model_call_step"
+    assert "check_output" in steps[5]["function_name"]
