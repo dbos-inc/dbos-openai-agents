@@ -396,3 +396,51 @@ async def test_explicit_handoff(dbos_env: None) -> None:
     assert steps[1]["function_name"] == "_model_call_step"
     assert "get_weather" in steps[2]["function_name"]
     assert steps[3]["function_name"] == "_model_call_step"
+
+
+@pytest.mark.asyncio
+async def test_replay(dbos_env: None) -> None:
+    """Forking a completed workflow replays all steps from recorded outputs."""
+    call_count = 0
+
+    @function_tool
+    @DBOS.step()
+    async def get_weather(city: str) -> str:
+        """Get the weather for a city."""
+        nonlocal call_count
+        call_count += 1
+        return f"Sunny in {city}"
+
+    model = FakeModel(
+        [
+            make_tool_call_response("call_1", "get_weather", '{"city": "NYC"}'),
+            make_message_response("The weather in NYC is sunny."),
+        ]
+    )
+    agent = Agent(name="test", model=model, tools=[get_weather])
+
+    @DBOS.workflow()
+    async def wf(user_input: str) -> str:
+        result = await DurableRunner.run(agent, user_input)
+        return str(result.final_output)
+
+    # Run the workflow for the first time
+    output = await wf("What's the weather in NYC?")
+    assert output == "The weather in NYC is sunny."
+    assert call_count == 1
+
+    workflows = await DBOS.list_workflows_async()
+    assert len(workflows) == 1
+    original_id = workflows[0].workflow_id
+    steps = await DBOS.list_workflow_steps_async(original_id)
+    assert len(steps) == 3
+
+    # Fork from past the last step so all steps replay from recorded outputs.
+    # function_ids are 1-based, so start_step must exceed the max function_id.
+    max_function_id = steps[-1]["function_id"]
+    handle = await DBOS.fork_workflow_async(original_id, max_function_id + 1)
+    replay_output = await handle.get_result()
+    assert replay_output == "The weather in NYC is sunny."
+
+    # The tool was NOT re-executed during replay
+    assert call_count == 1
