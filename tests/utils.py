@@ -1,8 +1,8 @@
 from typing import AsyncIterator
 
 from agents import Usage
-from agents.models.interface import Model
 from agents.items import ModelResponse, TResponseStreamEvent
+from agents.models.interface import Model
 from openai.types.responses import (
     ResponseFunctionToolCall,
     ResponseOutputMessage,
@@ -18,7 +18,9 @@ def make_message_response(text: str, response_id: str = "resp_1") -> ModelRespon
                 id="msg_1",
                 role="assistant",
                 status="completed",
-                content=[ResponseOutputText(type="output_text", text=text, annotations=[])],
+                content=[
+                    ResponseOutputText(type="output_text", text=text, annotations=[])
+                ],
             )
         ],
         usage=Usage(),

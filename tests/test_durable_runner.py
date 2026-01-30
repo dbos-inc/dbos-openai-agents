@@ -1,8 +1,6 @@
 import asyncio
 
 import pytest
-
-from dbos import DBOS
 from agents import (
     Agent,
     GuardrailFunctionOutput,
@@ -16,9 +14,10 @@ from agents import (
 from agents.items import ModelResponse
 from agents.tool import function_tool
 from agents.tool_guardrails import ToolInputGuardrailData, ToolOutputGuardrailData
+from dbos import DBOS
 from openai.types.responses import ResponseFunctionToolCall
-
 from utils import FakeModel, make_message_response, make_tool_call_response
+
 from dbos_openai import DurableRunner
 
 
@@ -56,10 +55,12 @@ async def test_tool_call(dbos_env):
         tool_calls_made.append(city)
         return f"Sunny in {city}"
 
-    model = FakeModel([
-        make_tool_call_response("call_1", "get_weather", '{"city": "NYC"}'),
-        make_message_response("The weather in NYC is sunny."),
-    ])
+    model = FakeModel(
+        [
+            make_tool_call_response("call_1", "get_weather", '{"city": "NYC"}'),
+            make_message_response("The weather in NYC is sunny."),
+        ]
+    )
     agent = Agent(name="test", model=model, tools=[get_weather])
 
     @DBOS.workflow()
@@ -100,22 +101,24 @@ async def test_multiple_tool_calls(dbos_env):
         concurrent -= 1
         return f"Sunny in {city}"
 
-    model = FakeModel([
-        ModelResponse(
-            output=[
-                ResponseFunctionToolCall(
-                    type="function_call",
-                    call_id=f"call_{i}",
-                    name="get_weather",
-                    arguments=f'{{"city": "{city}"}}',
-                )
-                for i, city in enumerate(cities)
-            ],
-            usage=Usage(),
-            response_id="resp_1",
-        ),
-        make_message_response("Done."),
-    ])
+    model = FakeModel(
+        [
+            ModelResponse(
+                output=[
+                    ResponseFunctionToolCall(
+                        type="function_call",
+                        call_id=f"call_{i}",
+                        name="get_weather",
+                        arguments=f'{{"city": "{city}"}}',
+                    )
+                    for i, city in enumerate(cities)
+                ],
+                usage=Usage(),
+                response_id="resp_1",
+            ),
+            make_message_response("Done."),
+        ]
+    )
     agent = Agent(name="test", model=model, tools=[get_weather])
 
     @DBOS.workflow()
@@ -126,7 +129,9 @@ async def test_multiple_tool_calls(dbos_env):
     output = await wf("Weather everywhere?")
     assert output == "Done."
     # Tools actually run concurrently (not sequentially)
-    assert max_concurrent > 1, f"Expected concurrent execution, but max_concurrent={max_concurrent}"
+    assert (
+        max_concurrent > 1
+    ), f"Expected concurrent execution, but max_concurrent={max_concurrent}"
 
     # 1 workflow, with 102 steps: 1 model call + 100 tool calls + 1 model call
     workflows = await DBOS.list_workflows_async()
@@ -148,13 +153,17 @@ async def test_guardrails(dbos_env):
 
     @tool_input_guardrail
     @DBOS.step()
-    async def validate_tool_input(data: ToolInputGuardrailData) -> ToolGuardrailFunctionOutput:
+    async def validate_tool_input(
+        data: ToolInputGuardrailData,
+    ) -> ToolGuardrailFunctionOutput:
         """Check tool input is acceptable."""
         return ToolGuardrailFunctionOutput.allow(output_info="input_ok")
 
     @tool_output_guardrail
     @DBOS.step()
-    async def validate_tool_output(data: ToolOutputGuardrailData) -> ToolGuardrailFunctionOutput:
+    async def validate_tool_output(
+        data: ToolOutputGuardrailData,
+    ) -> ToolGuardrailFunctionOutput:
         """Check tool output is acceptable."""
         return ToolGuardrailFunctionOutput.allow(output_info="output_ok")
 
@@ -180,10 +189,12 @@ async def test_guardrails(dbos_env):
             tripwire_triggered=len(output) == 0,
         )
 
-    model = FakeModel([
-        make_tool_call_response("call_1", "get_weather", '{"city": "NYC"}'),
-        make_message_response("The weather in NYC is sunny."),
-    ])
+    model = FakeModel(
+        [
+            make_tool_call_response("call_1", "get_weather", '{"city": "NYC"}'),
+            make_message_response("The weather in NYC is sunny."),
+        ]
+    )
     agent = Agent(
         name="test",
         model=model,

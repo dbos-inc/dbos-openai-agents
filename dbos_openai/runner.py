@@ -15,13 +15,12 @@ from agents.items import ModelResponse, TResponseOutputItem, TResponseStreamEven
 from agents.models.multi_provider import MultiProvider
 from agents.tool import FunctionTool, Tool
 from agents.tool_context import ToolContext
-
 from dbos import DBOS
-
 
 # ---------------------------------------------------------------------------
 # Turnstile: ordered execution of concurrent async operations
 # ---------------------------------------------------------------------------
+
 
 class Turnstile:
     """Serializes concurrent async operations in a fixed order by ID.
@@ -65,6 +64,7 @@ class _CanceledError(Exception):
 # Shared execution state
 # ---------------------------------------------------------------------------
 
+
 class _State:
     __slots__ = ("turnstile",)
 
@@ -76,7 +76,10 @@ class _State:
 # DBOS step wrappers (module-level so they're registered at import time)
 # ---------------------------------------------------------------------------
 
-@DBOS.step(retries_allowed=True, max_attempts=10, interval_seconds=1.0, backoff_rate=2.0)
+
+@DBOS.step(
+    retries_allowed=True, max_attempts=10, interval_seconds=1.0, backoff_rate=2.0
+)
 async def _model_call_step(call_fn):
     """Execute an LLM call as a durable DBOS step with retries."""
     return await call_fn()
@@ -85,6 +88,7 @@ async def _model_call_step(call_fn):
 # ---------------------------------------------------------------------------
 # Model provider / wrapper
 # ---------------------------------------------------------------------------
+
 
 def _get_function_call_ids(output: List[TResponseOutputItem]) -> List[str]:
     """Extract function call IDs from a model response."""
@@ -133,10 +137,13 @@ class DBOSModelWrapper(Model):
 # Tool wrapping
 # ---------------------------------------------------------------------------
 
+
 def _create_tool_wrapper(state: _State, tool: FunctionTool):
     """Create a turnstile-gated, DBOS-step-wrapped on_invoke_tool."""
 
-    async def on_invoke_tool_wrapper(tool_context: ToolContext[Any], tool_input: str) -> Any:
+    async def on_invoke_tool_wrapper(
+        tool_context: ToolContext[Any], tool_input: str
+    ) -> Any:
         turnstile = state.turnstile
         call_id = tool_context.tool_call_id
 
@@ -197,6 +204,7 @@ def _wrap_handoff(handoff: Handoff[TContext], state: _State) -> Handoff[TContext
 # ---------------------------------------------------------------------------
 # DurableRunner — main entry point
 # ---------------------------------------------------------------------------
+
 
 class DurableRunner:
     """Run an OpenAI agent with DBOS durability.
