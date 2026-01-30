@@ -77,9 +77,7 @@ class _State:
 # ---------------------------------------------------------------------------
 
 
-@DBOS.step(
-    retries_allowed=True, max_attempts=10, interval_seconds=1.0, backoff_rate=2.0
-)
+@DBOS.step()
 async def _model_call_step(
     call_fn: Callable[[], Awaitable[ModelResponse]],
 ) -> ModelResponse:

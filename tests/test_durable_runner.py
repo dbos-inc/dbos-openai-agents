@@ -7,6 +7,7 @@ from agents import (
     RunContextWrapper,
     ToolGuardrailFunctionOutput,
     Usage,
+    handoff,
     output_guardrail,
     tool_input_guardrail,
     tool_output_guardrail,
@@ -249,15 +250,131 @@ async def test_handoff(dbos_env: None) -> None:
     # Router agent: hands off to the weather agent
     router_model = FakeModel(
         [
-            make_tool_call_response(
-                "call_h1", "transfer_to_weather_agent", "{}"
-            ),
+            make_tool_call_response("call_h1", "transfer_to_weather_agent", "{}"),
         ]
     )
     router_agent = Agent(
         name="router",
         model=router_model,
         handoffs=[weather_agent],
+    )
+
+    @DBOS.workflow()
+    async def wf(user_input: str) -> str:
+        result = await DurableRunner.run(router_agent, user_input)
+        return str(result.final_output)
+
+    output = await wf("What's the weather in NYC?")
+    assert output == "The weather in NYC is sunny."
+
+    # 1 workflow with 4 steps:
+    #   model call (router → handoff), model call (weather → tool call),
+    #   tool call (get_weather), model call (weather → message)
+    workflows = await DBOS.list_workflows_async()
+    assert len(workflows) == 1
+    steps = await DBOS.list_workflow_steps_async(workflows[0].workflow_id)
+    assert len(steps) == 4
+    assert steps[0]["function_name"] == "_model_call_step"
+    assert steps[1]["function_name"] == "_model_call_step"
+    assert "get_weather" in steps[2]["function_name"]
+    assert steps[3]["function_name"] == "_model_call_step"
+
+
+@pytest.mark.asyncio
+async def test_tool_failure(dbos_env: None) -> None:
+    """When a parallel tool call fails, the SDK sends the error back to the model."""
+
+    @function_tool
+    @DBOS.step()
+    async def good_tool(city: str) -> str:
+        """A tool that succeeds."""
+        return f"Result for {city}"
+
+    @function_tool
+    @DBOS.step()
+    async def bad_tool(city: str) -> str:
+        """A tool that always fails."""
+        raise ValueError("Something went wrong")
+
+    model = FakeModel(
+        [
+            ModelResponse(
+                output=[
+                    ResponseFunctionToolCall(
+                        type="function_call",
+                        call_id="call_1",
+                        name="good_tool",
+                        arguments='{"city": "NYC"}',
+                    ),
+                    ResponseFunctionToolCall(
+                        type="function_call",
+                        call_id="call_2",
+                        name="bad_tool",
+                        arguments='{"city": "LA"}',
+                    ),
+                ],
+                usage=Usage(),
+                response_id="resp_1",
+            ),
+            make_message_response("Handled the error."),
+        ]
+    )
+    agent = Agent(name="test", model=model, tools=[good_tool, bad_tool])
+
+    @DBOS.workflow()
+    async def wf(user_input: str) -> str:
+        result = await DurableRunner.run(agent, user_input)
+        return str(result.final_output)
+
+    output = await wf("Do things")
+    assert output == "Handled the error."
+
+    # 1 workflow with 4 steps:
+    #   model call (returns 2 tool calls), good_tool, bad_tool (error),
+    #   model call (returns final message)
+    workflows = await DBOS.list_workflows_async()
+    assert len(workflows) == 1
+    steps = await DBOS.list_workflow_steps_async(workflows[0].workflow_id)
+    assert len(steps) == 4
+    assert steps[0]["function_name"] == "_model_call_step"
+    assert "good_tool" in steps[1]["function_name"]
+    assert steps[1]["output"] == "Result for NYC"
+    assert steps[1]["error"] is None
+    assert "bad_tool" in steps[2]["function_name"]
+    assert steps[2]["output"] is None
+    assert "Something went wrong" in str(steps[2]["error"])
+    assert steps[3]["function_name"] == "_model_call_step"
+
+
+@pytest.mark.asyncio
+async def test_explicit_handoff(dbos_env: None) -> None:
+    """DurableRunner handles explicit Handoff objects (not raw Agent)."""
+
+    @function_tool
+    @DBOS.step()
+    async def get_weather(city: str) -> str:
+        """Get the weather for a city."""
+        return f"Sunny in {city}"
+
+    weather_model = FakeModel(
+        [
+            make_tool_call_response("call_w1", "get_weather", '{"city": "NYC"}'),
+            make_message_response("The weather in NYC is sunny."),
+        ]
+    )
+    weather_agent = Agent(
+        name="weather_agent", model=weather_model, tools=[get_weather]
+    )
+
+    router_model = FakeModel(
+        [
+            make_tool_call_response("call_h1", "transfer_to_weather_agent", "{}"),
+        ]
+    )
+    router_agent = Agent(
+        name="router",
+        model=router_model,
+        handoffs=[handoff(weather_agent)],
     )
 
     @DBOS.workflow()
