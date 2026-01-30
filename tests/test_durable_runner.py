@@ -70,7 +70,9 @@ async def test_tool_call(dbos_env):
 
 @pytest.mark.asyncio
 async def test_multiple_tool_calls(dbos_env):
-    """DurableRunner handles multiple parallel tool calls in deterministic order."""
+    """DurableRunner handles 100 parallel tool calls in deterministic order."""
+    num_calls = 100
+    cities = [f"city_{i}" for i in range(num_calls)]
     call_order = []
 
     @function_tool
@@ -80,26 +82,20 @@ async def test_multiple_tool_calls(dbos_env):
         return f"Sunny in {city}"
 
     model = FakeModel([
-        # Model requests two tool calls at once
         ModelResponse(
             output=[
                 ResponseFunctionToolCall(
                     type="function_call",
-                    call_id="call_1",
+                    call_id=f"call_{i}",
                     name="get_weather",
-                    arguments='{"city": "NYC"}',
-                ),
-                ResponseFunctionToolCall(
-                    type="function_call",
-                    call_id="call_2",
-                    name="get_weather",
-                    arguments='{"city": "LA"}',
-                ),
+                    arguments=f'{{"city": "{city}"}}',
+                )
+                for i, city in enumerate(cities)
             ],
             usage=Usage(),
             response_id="resp_1",
         ),
-        make_message_response("NYC and LA are both sunny."),
+        make_message_response("Done."),
     ])
     agent = Agent(name="test", model=model, tools=[get_weather])
 
@@ -108,17 +104,17 @@ async def test_multiple_tool_calls(dbos_env):
         result = await DurableRunner.run(agent, user_input)
         return result.final_output
 
-    output = await wf("Weather in NYC and LA?")
-    assert output == "NYC and LA are both sunny."
+    output = await wf("Weather everywhere?")
+    assert output == "Done."
     # Turnstile ensures deterministic ordering matching the model response order
-    assert call_order == ["NYC", "LA"]
+    assert call_order == cities
 
-    # 1 workflow, with 4 steps: model call, 2 tool calls, model call
+    # 1 workflow, with 102 steps: 1 model call + 100 tool calls + 1 model call
     workflows = await DBOS.list_workflows_async()
     assert len(workflows) == 1
     steps = await DBOS.list_workflow_steps_async(workflows[0].workflow_id)
-    assert len(steps) == 4
+    assert len(steps) == num_calls + 2
     assert steps[0]["function_name"] == "_model_call_step"
-    assert steps[1]["function_name"] == "_tool_call_step"
-    assert steps[2]["function_name"] == "_tool_call_step"
-    assert steps[3]["function_name"] == "_model_call_step"
+    for i in range(1, num_calls + 1):
+        assert steps[i]["function_name"] == "_tool_call_step"
+    assert steps[num_calls + 1]["function_name"] == "_model_call_step"
