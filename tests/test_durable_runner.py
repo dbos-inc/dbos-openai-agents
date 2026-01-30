@@ -24,6 +24,13 @@ async def test_simple_message(dbos_env):
     output = await wf("Hi")
     assert output == "Hello!"
 
+    # 1 workflow, with 1 model call step
+    workflows = await DBOS.list_workflows_async()
+    assert len(workflows) == 1
+    steps = await DBOS.list_workflow_steps_async(workflows[0].workflow_id)
+    assert len(steps) == 1
+    assert steps[0]["function_name"] == "_model_call_step"
+
 
 @pytest.mark.asyncio
 async def test_tool_call(dbos_env):
@@ -50,6 +57,15 @@ async def test_tool_call(dbos_env):
     output = await wf("What's the weather in NYC?")
     assert output == "The weather in NYC is sunny."
     assert tool_calls_made == ["NYC"]
+
+    # 1 workflow, with 3 steps: model call, tool call, model call
+    workflows = await DBOS.list_workflows_async()
+    assert len(workflows) == 1
+    steps = await DBOS.list_workflow_steps_async(workflows[0].workflow_id)
+    assert len(steps) == 3
+    assert steps[0]["function_name"] == "_model_call_step"
+    assert steps[1]["function_name"] == "_tool_call_step"
+    assert steps[2]["function_name"] == "_model_call_step"
 
 
 @pytest.mark.asyncio
@@ -96,3 +112,13 @@ async def test_multiple_tool_calls(dbos_env):
     assert output == "NYC and LA are both sunny."
     # Turnstile ensures deterministic ordering matching the model response order
     assert call_order == ["NYC", "LA"]
+
+    # 1 workflow, with 4 steps: model call, 2 tool calls, model call
+    workflows = await DBOS.list_workflows_async()
+    assert len(workflows) == 1
+    steps = await DBOS.list_workflow_steps_async(workflows[0].workflow_id)
+    assert len(steps) == 4
+    assert steps[0]["function_name"] == "_model_call_step"
+    assert steps[1]["function_name"] == "_tool_call_step"
+    assert steps[2]["function_name"] == "_tool_call_step"
+    assert steps[3]["function_name"] == "_model_call_step"
