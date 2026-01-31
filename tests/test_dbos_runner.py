@@ -19,18 +19,18 @@ from dbos import DBOS
 from openai.types.responses import ResponseFunctionToolCall
 from utils import FakeModel, make_message_response, make_tool_call_response
 
-from dbos_openai import DurableRunner
+from dbos_openai_agents import DBOSRunner
 
 
 @pytest.mark.asyncio
 async def test_simple_message(dbos_env: None) -> None:
-    """DurableRunner returns a simple text response."""
+    """DBOSRunner returns a simple text response."""
     model = FakeModel([make_message_response("Hello!")])
     agent = Agent(name="test", model=model)
 
     @DBOS.workflow()
     async def wf(user_input: str) -> str:
-        result = await DurableRunner.run(agent, user_input)
+        result = await DBOSRunner.run(agent, user_input)
         return str(result.final_output)
 
     output = await wf("Hi")
@@ -46,7 +46,7 @@ async def test_simple_message(dbos_env: None) -> None:
 
 @pytest.mark.asyncio
 async def test_tool_call(dbos_env: None) -> None:
-    """DurableRunner executes a tool call and returns the final message."""
+    """DBOSRunner executes a tool call and returns the final message."""
     tool_calls_made: list[str] = []
 
     @function_tool
@@ -66,7 +66,7 @@ async def test_tool_call(dbos_env: None) -> None:
 
     @DBOS.workflow()
     async def wf(user_input: str) -> str:
-        result = await DurableRunner.run(agent, user_input)
+        result = await DBOSRunner.run(agent, user_input)
         return str(result.final_output)
 
     output = await wf("What's the weather in NYC?")
@@ -85,7 +85,7 @@ async def test_tool_call(dbos_env: None) -> None:
 
 @pytest.mark.asyncio
 async def test_multiple_tool_calls(dbos_env: None) -> None:
-    """DurableRunner handles parallel tool calls that start in deterministic order."""
+    """DBOSRunner handles parallel tool calls that start in deterministic order."""
     num_calls = 100
     cities = [f"city_{i}" for i in range(num_calls)]
     concurrent = 0
@@ -124,7 +124,7 @@ async def test_multiple_tool_calls(dbos_env: None) -> None:
 
     @DBOS.workflow()
     async def wf(user_input: str) -> str:
-        result = await DurableRunner.run(agent, user_input)
+        result = await DBOSRunner.run(agent, user_input)
         return str(result.final_output)
 
     output = await wf("Weather everywhere?")
@@ -150,7 +150,7 @@ async def test_multiple_tool_calls(dbos_env: None) -> None:
 
 @pytest.mark.asyncio
 async def test_guardrails(dbos_env: None) -> None:
-    """DurableRunner works with DBOS step-annotated guardrails on tools and agent output."""
+    """DBOSRunner works with DBOS step-annotated guardrails on tools and agent output."""
 
     @tool_input_guardrail
     @DBOS.step()
@@ -205,7 +205,7 @@ async def test_guardrails(dbos_env: None) -> None:
 
     @DBOS.workflow()
     async def wf(user_input: str) -> str:
-        result = await DurableRunner.run(agent, user_input)
+        result = await DBOSRunner.run(agent, user_input)
         return str(result.final_output)
 
     output = await wf("What's the weather in NYC?")
@@ -228,7 +228,7 @@ async def test_guardrails(dbos_env: None) -> None:
 
 @pytest.mark.asyncio
 async def test_handoff(dbos_env: None) -> None:
-    """DurableRunner handles agent handoffs between multiple agents."""
+    """DBOSRunner handles agent handoffs between multiple agents."""
 
     @function_tool
     @DBOS.step()
@@ -261,7 +261,7 @@ async def test_handoff(dbos_env: None) -> None:
 
     @DBOS.workflow()
     async def wf(user_input: str) -> str:
-        result = await DurableRunner.run(router_agent, user_input)
+        result = await DBOSRunner.run(router_agent, user_input)
         return str(result.final_output)
 
     output = await wf("What's the weather in NYC?")
@@ -323,7 +323,7 @@ async def test_tool_failure(dbos_env: None) -> None:
 
     @DBOS.workflow()
     async def wf(user_input: str) -> str:
-        result = await DurableRunner.run(agent, user_input)
+        result = await DBOSRunner.run(agent, user_input)
         return str(result.final_output)
 
     output = await wf("Do things")
@@ -348,7 +348,7 @@ async def test_tool_failure(dbos_env: None) -> None:
 
 @pytest.mark.asyncio
 async def test_explicit_handoff(dbos_env: None) -> None:
-    """DurableRunner handles explicit Handoff objects (not raw Agent)."""
+    """DBOSRunner handles explicit Handoff objects (not raw Agent)."""
 
     @function_tool
     @DBOS.step()
@@ -379,7 +379,7 @@ async def test_explicit_handoff(dbos_env: None) -> None:
 
     @DBOS.workflow()
     async def wf(user_input: str) -> str:
-        result = await DurableRunner.run(router_agent, user_input)
+        result = await DBOSRunner.run(router_agent, user_input)
         return str(result.final_output)
 
     output = await wf("What's the weather in NYC?")
@@ -421,7 +421,7 @@ async def test_replay(dbos_env: None) -> None:
 
     @DBOS.workflow()
     async def wf(user_input: str) -> str:
-        result = await DurableRunner.run(agent, user_input)
+        result = await DBOSRunner.run(agent, user_input)
         return str(result.final_output)
 
     # Run the workflow for the first time
@@ -448,7 +448,7 @@ async def test_replay(dbos_env: None) -> None:
 
 def test_streaming_not_supported() -> None:
     """DBOSModelWrapper.stream_response raises NotImplementedError."""
-    from dbos_openai.runner import DBOSModelWrapper, _State
+    from dbos_openai_agents.runner import DBOSModelWrapper, _State
 
     wrapper = DBOSModelWrapper(FakeModel([]), _State())
     with pytest.raises(NotImplementedError, match="Streaming is not supported"):
@@ -469,7 +469,7 @@ async def test_string_model_name(dbos_env: None) -> None:
 
         @DBOS.workflow()
         async def wf(user_input: str) -> str:
-            result = await DurableRunner.run(agent, user_input)
+            result = await DBOSRunner.run(agent, user_input)
             return str(result.final_output)
 
         output = await wf("Hi")

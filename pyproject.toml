@@ -3,7 +3,7 @@ requires = ["hatchling", "gitpython>=3.1.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "dbos-openai"
+name = "dbos-openai-agents"
 dynamic = ["version"]
 description = "DBOS integration for the OpenAI Agents SDK"
 readme = "README.md"

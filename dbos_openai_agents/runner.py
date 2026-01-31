@@ -106,7 +106,7 @@ class DBOSModelWrapper(Model):
         self, *args: Any, **kwargs: Any
     ) -> AsyncIterator[TResponseStreamEvent]:
         raise NotImplementedError(
-            "Streaming is not supported in durable mode. Use DurableRunner.run() instead."
+            "Streaming is not supported in durable mode. Use DBOSRunner.run() instead."
         )
 
 
@@ -179,11 +179,11 @@ def _wrap_handoff(handoff: Handoff[TContext], state: _State) -> Handoff[TContext
 
 
 # ---------------------------------------------------------------------------
-# DurableRunner
+# DBOSRunner
 # ---------------------------------------------------------------------------
 
 
-class DurableRunner:
+class DBOSRunner:
     """Run an OpenAI agent with DBOS durability.
 
     Must be called from within a ``@DBOS.workflow()`` for durable execution.
@@ -192,7 +192,7 @@ class DurableRunner:
 
         @DBOS.workflow()
         async def run_agent(user_input: str):
-            result = await DurableRunner.run(agent, user_input)
+            result = await DBOSRunner.run(agent, user_input)
             return result.final_output
     """
 
