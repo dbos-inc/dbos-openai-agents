@@ -184,25 +184,26 @@ def _wrap_handoff(handoff: Handoff[TContext], state: _State) -> Handoff[TContext
 
 
 class DBOSRunner:
-    """Run an OpenAI agent with DBOS durability.
-
-    Must be called from within a ``@DBOS.workflow()`` for durable execution.
-
-    Example::
-
-        @DBOS.workflow()
-        async def run_agent(user_input: str):
-            result = await DBOSRunner.run(agent, user_input)
-            return result.final_output
-    """
-
     # This is not a workflow because the Agent type is not pickle-able.
-    @staticmethod
+    @classmethod
     async def run(
+        cls,
         starting_agent: Agent[TContext],
         input: str | list[Any],
         **kwargs: Any,
     ) -> RunResult:
+        """Run an OpenAI agent with DBOS durability.
+
+        Must be called from within a ``@DBOS.workflow()`` for durable execution.
+
+        Example::
+
+            @DBOS.workflow()
+            async def run_agent(user_input: str):
+                result = await DBOSRunner.run(agent, user_input)
+                return result.final_output
+        """
+
         state = _State()
 
         run_config = kwargs.pop("run_config", RunConfig())
@@ -214,6 +215,42 @@ class DBOSRunner:
         agent = _wrap_agent(starting_agent, state)
 
         return await Runner.run(
+            starting_agent=agent,
+            input=input,
+            run_config=run_config,
+            **kwargs,
+        )
+
+    @classmethod
+    def run_sync(
+        cls,
+        starting_agent: Agent[TContext],
+        input: str | list[Any],
+        **kwargs: Any,
+    ) -> RunResult:
+        """Run an OpenAI agent synchronously with DBOS durability.
+
+        Must be called from within a ``@DBOS.workflow()`` for durable execution.
+
+        Example::
+
+            @DBOS.workflow()
+            def run_agent(user_input: str):
+                result = DBOSRunner.run_sync(agent, user_input)
+                return result.final_output
+        """
+
+        state = _State()
+
+        run_config = kwargs.pop("run_config", RunConfig())
+        run_config = dataclasses.replace(
+            run_config,
+            model_provider=DBOSModelProvider(state),
+        )
+
+        agent = _wrap_agent(starting_agent, state)
+
+        return Runner.run_sync(
             starting_agent=agent,
             input=input,
             run_config=run_config,
