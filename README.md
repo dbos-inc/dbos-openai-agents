@@ -17,7 +17,7 @@ Annotate tool calls and guardrails with `@DBOS.step()`.
 import asyncio
 from agents import Agent, function_tool
 from dbos import DBOS, DBOSConfig
-from dbos_openai import DBOSRunner
+from dbos_openai_agents import DBOSRunner
 
 # Decorate tool calls and guardrails with @DBOS.step() for durable execution
 @function_tool
