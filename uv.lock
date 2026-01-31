@@ -480,7 +480,7 @@ wheels = [
 ]
 
 [[package]]
-name = "dbos-openai"
+name = "dbos-openai-agents"
 source = { editable = "." }
 dependencies = [
     { name = "dbos" },

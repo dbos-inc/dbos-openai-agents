@@ -183,7 +183,7 @@ def _wrap_handoff(handoff: Handoff[TContext], state: _State) -> Handoff[TContext
 # ---------------------------------------------------------------------------
 
 
-class DurableRunner:
+class DBOSRunner:
     """Run an OpenAI agent with DBOS durability.
 
     Must be called from within a ``@DBOS.workflow()`` for durable execution.

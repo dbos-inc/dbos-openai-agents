@@ -5,19 +5,19 @@ Durable execution for the [OpenAI Agents SDK](https://github.com/openai/openai-a
 ## Installation
 
 ```bash
-pip install dbos-openai
+pip install dbos-openai-agents
 ```
 
 ## Usage
 
-Call your agent using `DurableRunner.run()` from a `@DBOS.workflow()`.
+Call your agent using `DBOSRunner.run()` from a `@DBOS.workflow()`.
 Annotate tool calls and guardrails with `@DBOS.step()`.
 
 ```python
 import asyncio
 from agents import Agent, function_tool
 from dbos import DBOS, DBOSConfig
-from dbos_openai import DurableRunner
+from dbos_openai import DBOSRunner
 
 # Decorate tool calls and guardrails with @DBOS.step() for durable execution
 @function_tool
@@ -28,10 +28,10 @@ async def get_weather(city: str) -> str:
 
 agent = Agent(name="weather", tools=[get_weather])
 
-# Use DurableRunner to call your agent from a workflow
+# Use DBOSRunner to call your agent from a workflow
 @DBOS.workflow()
 async def run_agent(user_input: str) -> str:
-    result = await DurableRunner.run(agent, user_input)
+    result = await DBOSRunner.run(agent, user_input)
     return str(result.final_output)
 
 
@@ -49,5 +49,5 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-`DurableRunner.run()` is a drop-in replacement for `Runner.run()` with the same arguments.
+`DBOSRunner.run()` is a drop-in replacement for `Runner.run()` with the same arguments.
 It must be called from within a `@DBOS.workflow()`.
